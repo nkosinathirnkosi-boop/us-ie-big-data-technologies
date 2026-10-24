@@ -52,6 +52,15 @@ def run_task3_duckdb(student_nr: int, db_path: str = "factory_telemetry.duckdb")
     # the attached PostgreSQL table `pg.obt_sensor_events`.
     # -------------------------------------------------------------------------
     
+    # -------------------------------------------------------------------------
+    # TODO 1: Materialize PostgreSQL data into DuckDB
+    # -------------------------------------------------------------------------
+    con.execute("""
+        CREATE OR REPLACE TABLE obt_columnar AS
+        SELECT *
+        FROM pg.public.obt_sensor_events;
+    """)
+
     ingest_duration = time.time() - t_ingest_start
     try:
         total_rows = con.execute("SELECT count(*) FROM obt_columnar;").fetchone()[0]
@@ -74,7 +83,28 @@ def run_task3_duckdb(student_nr: int, db_path: str = "factory_telemetry.duckdb")
     # The feature definitions are in the Task 3 section of the brief.
     # -------------------------------------------------------------------------
     query_features = """
-        -- TODO: Implement your analytical feature extraction query here
+        SELECT
+            equipment_id,
+            COUNT(*) AS total_samples,
+
+            ROUND(
+                AVG(process_temp_k - air_temp_k),
+                3
+            ) AS mean_delta_temp,
+
+            ROUND(
+                STDDEV_SAMP(
+                    rotational_speed_rpm * torque_nm * 0.1047
+                ),
+                2
+            ) AS power_volatility_w,
+
+            SUM(machine_failure) AS total_failures
+
+        FROM obt_columnar
+
+        GROUP BY equipment_id
+        ORDER BY equipment_id;
     """
     
     try:
